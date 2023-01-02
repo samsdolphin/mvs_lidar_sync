@@ -130,20 +130,35 @@ static void *WorkThread(void *pUser)
 
   while(ros::ok())
   {
-    nRet = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
-    srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
-    mBuf.lock();
-    img_buff.push_back(srcImage);
-    mBuf.unlock();
-    ros::Duration(0.050).sleep();//delay 50ms
-    ros::spinOnce();
+    if(img_buff.empty())
+    {
+      ros::Time t0 = ros::Time::now();
+      nRet = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
+      ROS_INFO_STREAM("get image time "<<(ros::Time::now()-t0).toSec()*1000<<"ms");
+      srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
+      mBuf.lock();
+      img_buff.push_back(srcImage);
+      mBuf.unlock();
+    }
     ros::Time begin = ros::Time::now();
+    ros::Duration(0.050).sleep();
+    ros::spinOnce();
+    
     while(!(gps_cur_t-gps_pre_t < 0.15 && gps_cur_t-gps_pre_t > 0.05))
     {
-      gps_pre_t = gps_cur_t;
+      int status = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 10);
+      if(status == MV_OK)
+      {
+        srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
+        mBuf.lock();
+        img_buff.push_back(srcImage);
+        mBuf.unlock();
+      }
       ros::spinOnce();
+      if((ros::Time::now()-begin).toSec() > 0.05 && gps_cur_t > gps_pre_t) continue;
     }
     ROS_INFO_STREAM("image waiting time "<<(ros::Time::now()-begin).toSec()*1000<<"ms");
+
     if(nRet == MV_OK)
     {
       ros::Time rcv_time = ros::Time().fromSec(gps_cur_t);
