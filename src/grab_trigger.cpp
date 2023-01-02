@@ -11,6 +11,7 @@
 #include <ros/ros.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <mutex>
 using namespace std;
 
 unsigned int g_nPayloadSize = 0;
@@ -21,6 +22,7 @@ std::string ExposureAutoStr[3] = {"Off", "Once", "Continues"};
 std::string GainAutoStr[3] = {"Off", "Once", "Continues"};
 std::string CameraName;
 double gps_cur_t = 0.0, gps_pre_t = 0.0;
+mutex mBuf;
 
 void setParams(void *handle, const std::string &params_file)
 {
@@ -123,11 +125,18 @@ static void *WorkThread(void *pUser)
   if(NULL == pData) return NULL;
 
   unsigned int nDataSize = stParam.nCurValue;
+  deque<cv::Mat> img_buff;
+  cv::Mat srcImage;
 
   while(ros::ok())
   {
-    ros::spinOnce();
     nRet = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
+    srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
+    mBuf.lock();
+    img_buff.push_back(srcImage);
+    mBuf.unlock();
+    ros::Duration(0.050).sleep();//delay 50ms
+    ros::spinOnce();
     ros::Time begin = ros::Time::now();
     while(!(gps_cur_t-gps_pre_t < 0.15 && gps_cur_t-gps_pre_t > 0.05))
     {
@@ -144,8 +153,10 @@ static void *WorkThread(void *pUser)
                   std::to_string(stImageInfo.nFrameNum) + "], FrameTime:" +
                   std::to_string(rcv_time.toSec());
       ROS_INFO_STREAM(debug_msg.c_str());
-      cv::Mat srcImage;
-      srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
+      srcImage = img_buff.front();
+      mBuf.lock();
+      img_buff.pop_front();
+      mBuf.unlock();
       sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", srcImage).toImageMsg();
       msg->header.stamp = rcv_time;
       pub.publish(msg);
