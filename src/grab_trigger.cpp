@@ -141,7 +141,7 @@ static void *WorkThread(void *pUser)
       mBuf.unlock();
     }
     ros::Time begin = ros::Time::now();
-    ros::Duration(0.050).sleep();
+    // ros::Duration(0.050).sleep();
     ros::spinOnce();
     
     while(!(gps_cur_t-gps_pre_t < 0.15 && gps_cur_t-gps_pre_t > 0.05))
@@ -155,7 +155,8 @@ static void *WorkThread(void *pUser)
         mBuf.unlock();
       }
       ros::spinOnce();
-      if((ros::Time::now()-begin).toSec() > 0.05 && gps_cur_t > gps_pre_t) continue;
+      if((ros::Time::now()-begin).toSec() > 0.0 && (ros::Time::now()-begin).toSec() < 0.05) gps_pre_t = gps_cur_t;
+      else if((ros::Time::now()-begin).toSec() > 0.05) break;
     }
     ROS_INFO_STREAM("image waiting time "<<(ros::Time::now()-begin).toSec()*1000<<"ms");
 
