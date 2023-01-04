@@ -126,7 +126,9 @@ static void *WorkThread(void *pUser)
 
   unsigned int nDataSize = stParam.nCurValue;
   deque<cv::Mat> img_buff;
+  deque<double> receive_time;
   cv::Mat srcImage;
+  double begin_time = 0.0;
 
   while(ros::ok())
   {
@@ -136,13 +138,18 @@ static void *WorkThread(void *pUser)
       nRet = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
       ROS_INFO_STREAM("get image time "<<(ros::Time::now()-t0).toSec()*1000<<"ms");
       srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
+      
       mBuf.lock();
       img_buff.push_back(srcImage);
+      receive_time.push_back(ros::Time::now().toSec());
       mBuf.unlock();
     }
-    ros::Time begin = ros::Time::now();
+    begin_time = receive_time.front();
+    mBuf.lock();
+    receive_time.pop_front();
+    mBuf.unlock();
     // ros::Duration(0.050).sleep();
-    ros::spinOnce();
+    // ros::spinOnce();
     
     while(!(gps_cur_t-gps_pre_t < 0.15 && gps_cur_t-gps_pre_t > 0.05))
     {
@@ -150,13 +157,17 @@ static void *WorkThread(void *pUser)
       if(status == MV_OK)
       {
         srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
+        
         mBuf.lock();
         img_buff.push_back(srcImage);
+        receive_time.push_back(ros::Time::now().toSec());
         mBuf.unlock();
       }
+      
+      if(gps_cur_t-begin_time > 0.0 && gps_cur_t-begin_time < 0.05) gps_pre_t = gps_cur_t;
+      else if(gps_cur_t-begin_time > 0.05) break;
+
       ros::spinOnce();
-      if((ros::Time::now()-begin).toSec() > 0.0 && (ros::Time::now()-begin).toSec() < 0.05) gps_pre_t = gps_cur_t;
-      else if((ros::Time::now()-begin).toSec() > 0.05) break;
     }
     ROS_INFO_STREAM("image waiting time "<<(ros::Time::now()-begin).toSec()*1000<<"ms");
 
