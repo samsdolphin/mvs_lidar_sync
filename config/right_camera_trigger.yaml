@@ -16,3 +16,4 @@ GainAuto: 2
 ExposureTime: 1000
 # Gamma Selector, 0 stands for user, 1 stands for sRGB
 GammaSelector: 1
+FrameRate: 10.0

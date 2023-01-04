@@ -1,0 +1,7 @@
+<launch>
+  <node pkg="mvs_lidar_sync" type="parse_bag" name="parse_bag" output="screen">
+    <param name="bag_path" type="string" value="/home/sam/1668742749.512859.bag"/>
+    <param name="write_path" type="string" value="/home/sam/"/>
+    <param name="topic_name" type="string" value="/right_camera/image/compressed"/>
+  </node>
+</launch>
