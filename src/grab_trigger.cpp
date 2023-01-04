@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <mutex>
+#include <mutex>
 using namespace std;
 
 unsigned int g_nPayloadSize = 0;
@@ -21,7 +22,7 @@ image_transport::Publisher pub;
 std::string ExposureAutoStr[3] = {"Off", "Once", "Continues"};
 std::string GainAutoStr[3] = {"Off", "Once", "Continues"};
 std::string CameraName;
-double gps_cur_t = 0.0, gps_pre_t = 0.0;
+double gps_cur_t = 0.0, gps_pre_t = 0.0, cur_t = 0.0, pre_t = 0.0;
 mutex mBuf;
 
 void setParams(void *handle, const std::string &params_file)
@@ -64,7 +65,7 @@ void setParams(void *handle, const std::string &params_file)
   if(MV_OK == nRet)
   {
     std::string msg =
-        "Set Exposure Time Lower: " + std::to_string(ExposureTimeLower) + "ms";
+        "Set Exposure Time Lower: " + std::to_string(ExposureTimeLower*1e-3) + "ms";
     ROS_INFO_STREAM(msg.c_str());
   }
   else
@@ -75,7 +76,7 @@ void setParams(void *handle, const std::string &params_file)
   if(MV_OK == nRet)
   {
     std::string msg =
-        "Set Exposure Time Upper: " + std::to_string(ExposureTimeUpper) + "ms";
+        "Set Exposure Time Upper: " + std::to_string(ExposureTimeUpper*1e-3) + "ms";
     ROS_INFO_STREAM(msg.c_str());
   }
   else
@@ -151,7 +152,7 @@ static void *WorkThread(void *pUser)
     // ros::Duration(0.050).sleep();
     // ros::spinOnce();
     
-    while(!(gps_cur_t-gps_pre_t < 0.15 && gps_cur_t-gps_pre_t > 0.05))
+    while(!(cur_t-pre_t < 0.15 && cur_t-pre_t > 0.05))
     {
       nRet = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 10);
       if(nRet == MV_OK)
@@ -164,31 +165,31 @@ static void *WorkThread(void *pUser)
         mBuf.unlock();
       }
       
-      if(gps_cur_t-begin_time > 0.0 && gps_cur_t-begin_time < 0.05) gps_pre_t = gps_cur_t;
-      else if(gps_cur_t-begin_time > 0.05) break;
+      if(cur_t-begin_time > 0.0 && cur_t-begin_time < 0.05) pre_t = cur_t;
+      else if(cur_t-begin_time > 0.05) break;
 
       ros::spinOnce();
+      // cout<<setprecision(12)<<cur_t<<" "<<begin_time<<endl;
     }
-    ROS_INFO_STREAM("image waiting time "<<(ros::Time::now()-begin).toSec()*1000<<"ms");
+    ROS_INFO_STREAM("image waiting time "<<(ros::Time::now().toSec()-begin_time)*1000<<"ms");
 
-    if(nRet == MV_OK)
-    {
-      ros::Time rcv_time = ros::Time().fromSec(gps_cur_t);
-      // if(int(gps_cur_t)%10==0) std::cout<<gps_cur_t<<" "<<std::setprecision(15)<<ros::Time::now().toSec()<<std::endl;
-      std::string debug_msg;
-      debug_msg = CameraName + " GetOneFrame, nFrameNum[" +
-                  std::to_string(stImageInfo.nFrameNum) + "], FrameTime:" +
-                  std::to_string(rcv_time.toSec());
-      ROS_INFO_STREAM(debug_msg.c_str());
-      srcImage = img_buff.front();
-      mBuf.lock();
-      img_buff.pop_front();
-      mBuf.unlock();
-      sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", srcImage).toImageMsg();
-      msg->header.stamp = rcv_time;
-      pub.publish(msg);
-    }
-    gps_pre_t = gps_cur_t;
+    ros::Time rcv_time = ros::Time().fromSec(gps_cur_t);
+    // if(int(gps_cur_t)%10==0) std::cout<<gps_cur_t<<" "<<std::setprecision(15)<<ros::Time::now().toSec()<<std::endl;
+    std::string debug_msg;
+    debug_msg = CameraName + " GetOneFrame, nFrameNum[" +
+                std::to_string(stImageInfo.nFrameNum) + "], FrameTime:" +
+                std::to_string(rcv_time.toSec());
+    ROS_INFO_STREAM(debug_msg.c_str());
+    srcImage = img_buff.front();
+    mBuf.lock();
+    img_buff.pop_front();
+    mBuf.unlock();
+    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", srcImage).toImageMsg();
+    msg->header.stamp = rcv_time;
+    pub.publish(msg);
+    
+    pre_t = cur_t;
+
     if(exit_flag) break;
   }
 
@@ -203,6 +204,7 @@ static void *WorkThread(void *pUser)
 void timeCallback(const livox_ros_driver::CustomMsg::ConstPtr& msg)
 {
   gps_cur_t = msg->header.stamp.toSec();
+  cur_t = ros::Time::now().toSec();
 }
 
 // void timeCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
