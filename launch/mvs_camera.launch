@@ -3,7 +3,7 @@
     pkg="mvs_lidar_sync"
     type="grabImg"
     name="mvs_camera"
-    args="$(find mvs_lidar_sync)/config/500w.yaml"
+    args="$(find mvs_lidar_sync)/config/right_camera_trigger.yaml"
     respawn="true"
     output="screen"
   />

@@ -75,3 +75,6 @@ target_link_libraries(time_source ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(record_bag src/record_rosbag.cpp)
 target_link_libraries(record_bag ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable(parse_bag src/parse_bag.cpp)
+target_link_libraries(parse_bag ${catkin_LIBRARIES} ${PCL_LIBRARIES})
