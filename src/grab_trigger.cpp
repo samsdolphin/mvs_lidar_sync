@@ -153,8 +153,8 @@ static void *WorkThread(void *pUser)
     
     while(!(gps_cur_t-gps_pre_t < 0.15 && gps_cur_t-gps_pre_t > 0.05))
     {
-      int status = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 10);
-      if(status == MV_OK)
+      nRet = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 10);
+      if(nRet == MV_OK)
       {
         srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
         
@@ -200,15 +200,15 @@ static void *WorkThread(void *pUser)
   return 0;
 }
 
-// void timeCallback(const livox_ros_driver::CustomMsg::ConstPtr& msg)
-// {
-//   gps_cur_t = msg->header.stamp.toSec();
-// }
-
-void timeCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
+void timeCallback(const livox_ros_driver::CustomMsg::ConstPtr& msg)
 {
   gps_cur_t = msg->header.stamp.toSec();
 }
+
+// void timeCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
+// {
+//   gps_cur_t = msg->header.stamp.toSec();
+// }
 
 int main(int argc, char **argv)
 {
@@ -235,8 +235,8 @@ int main(int argc, char **argv)
   CameraName = camera_name;
   pub = it.advertise(pub_topic, 1);
 
-  ros::Subscriber sub = nh.subscribe("ouster/points", 1, timeCallback);
-  // ros::Subscriber sub = nh.subscribe("livox/lidar", 1, timeCallback);
+  // ros::Subscriber sub = nh.subscribe("ouster/points", 1, timeCallback);
+  ros::Subscriber sub = nh.subscribe("livox/lidar", 1, timeCallback);
 
   while(ros::ok())
   {
